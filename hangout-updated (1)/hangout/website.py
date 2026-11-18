@@ -202,9 +202,24 @@ window.SocketClient = (() => {
   return {
     connect(token) {
       return new Promise((resolve, reject) => {
-        sock = io({ auth: { token }, transports: ["websocket"] });
+        // Start with Engine.IO polling, then upgrade to WebSocket when the
+        // hosting proxy supports it. Forcing WebSocket-only can fail on some
+        // reverse proxies and leaves the login screen stuck offline.
+        sock = io({
+          auth: { token },
+          transports: ["polling", "websocket"],
+          upgrade: true,
+          timeout: 20000,
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000
+        });
         sock.once("connect", resolve);
-        sock.once("connect_error", (e) => { sock.close(); reject(e); });
+        sock.once("connect_error", (e) => {
+          console.error("Hangout Socket.IO connection failed:", e && (e.message || e));
+          sock.close();
+          reject(e);
+        });
         sock.on("connect", () => tell("online"));
         sock.on("disconnect", () => tell("offline"));
       });
@@ -411,11 +426,16 @@ window.Hang = (() => {
     $("nameErr").textContent = ""; $("btnContinue").disabled = true;
     try {
       const r = await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
-      if (!r.ok) throw new Error("session");
+      if (!r.ok) {
+        const detail = await r.text().catch(() => "");
+        throw new Error(`Session request failed (${r.status}): ${detail.slice(0, 160)}`);
+      }
       const { token } = await r.json();
+      if (!token) throw new Error("The server did not return a session token.");
       await SocketClient.connect(token);
     } catch (e) {
-      $("nameErr").textContent = "Couldn’t connect. Try again in a moment.";
+      console.error("Hangout sign-in failed:", e);
+      $("nameErr").textContent = "Couldn't connect to the server. Please refresh and try again.";
       $("btnContinue").disabled = false;
       return;
     }
