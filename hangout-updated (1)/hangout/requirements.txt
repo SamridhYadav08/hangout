@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-socketio>=5.11
+pyjwt>=2.8
+python-chess>=1.10
+pydantic>=2.6
+nh3>=0.2.17

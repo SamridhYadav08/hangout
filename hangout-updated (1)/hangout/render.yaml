@@ -1,0 +1,17 @@
+# Render Blueprint: push this folder to GitHub, then New > Blueprint.
+services:
+  - type: web
+    name: hangout
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # ONE worker only: rooms and games live in memory.
+    startCommand: uvicorn main:asgi --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        sync: false   # optional, e.g. https://hangout.onrender.com
